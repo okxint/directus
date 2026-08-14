@@ -463,7 +463,11 @@ describe('non-admin users', () => {
 			}
 		});
 
-		it('should not apply store field restrictions for versions regardless of field policy', () => {
+		it('should apply store field-level restrictions for versions even when item-level condition fails', () => {
+			// Field-level access lists are static and can be checked up-front in the version editor.
+			// Item-level conditions are still deferred to promote time (hence isVersion=true bypasses
+			// fetchedItemPermissions), but fields outside the update permission's list must be readonly
+			// so they cannot silently enter the delta and make the version impossible to promote.
 			const allowedFields = ['id', 'start_date'];
 
 			const permissionsStore = mockedStore(usePermissionsStore());
@@ -474,7 +478,7 @@ describe('non-admin users', () => {
 			});
 
 			fetchedItemPermissions = computed(() => ({
-				update: { access: false }, // main item fails condition
+				update: { access: false }, // main item fails condition — ignored for versions
 				delete: { access: false },
 				share: { access: false },
 			}));
@@ -482,7 +486,8 @@ describe('non-admin users', () => {
 			const fields = getFields(sample.collection, false, fetchedItemPermissions, true);
 
 			for (const field of fields.value) {
-				expect(!!field.meta?.readonly).toBe(false);
+				const readonly = allowedFields.includes(field.field) ? undefined : true;
+				expect(field.meta?.readonly).toBe(readonly);
 			}
 		});
 
